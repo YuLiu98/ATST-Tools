@@ -3,6 +3,7 @@
 # part of ATST-Tools scripts
 
 import os
+from ase.calculators.FCPelectrochem import FCP
 from ase.calculators.abacus import Abacus, AbacusProfile
 from ase.optimize import FIRE, BFGS
 from ase.mep.neb import NEB, DyNEB # newest ase
@@ -129,3 +130,28 @@ class AbacusNEB:
         opt = optimizer(neb, trajectory=traj)
         opt.run(fmax)
         print("----- NEB calculation finished -----")
+
+class FcpNEB(AbacusNEB):
+    """Customize Nudged Elastic Band calculation workflow by using FCP-abacus-ase"""
+
+    def __init__(self, init_chain, fcp_parameters, parameters, abacus='abacus',
+                 dyneb=False, k=0.1, algorism="improvedtangent", 
+                 directory='NEB', mpi=1, omp=1, parallel=True, ) -> None:
+
+        AbacusNEB.__init__(self, init_chain, parameters, abacus, dyneb, k, algorism, directory, mpi, omp, parallel)
+
+        """parameters for FCP"""
+        self.fcp_parameters = fcp_parameters
+    
+    def set_calculator(self):
+        """Set FCP calculators"""
+        os.environ['OMP_NUM_THREADS'] = f'{self.omp}'
+        profile = AbacusProfile(
+            argv=['mpirun', '-np', f'{self.mpi}', self.abacus])
+        if self.parallel:
+            out_directory = f"{self.directory}-rank{world.rank}"
+        else:
+            out_directory = self.directory
+        calc = Abacus(profile=profile, directory=out_directory, **self.parameters)
+        calc_fcp = FCP(innercalc = calc, **self.fcp_parameters)
+        return calc_fcp

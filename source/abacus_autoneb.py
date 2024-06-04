@@ -140,3 +140,31 @@ class AbacusAutoNEB:
                             optimizer = optimizer, smooth_curve = smooth_curve)
         autoneb.run()
         parprint("----- AutoNEB calculation finished -----")
+
+class FcpAutoNEB(AbacusAutoNEB):
+    """Customize AutoNEB calculation workflow by using FCP-abacus-ase"""
+
+    def __init__(self, init_chain, fcp_parameters, parameters, 
+                 abacus='abacus',  prefix="run_autoneb", 
+                 n_simul=1, n_max=10, k=0.10,
+                 algorism="improvedtangent", 
+                 directory='AutoNEBrun', mpi=1, omp=1, parallel=True, ):
+
+        AbacusAutoNEB.__init__(self, init_chain, parameters, abacus, prefix, 
+                                n_simul, n_max, k, algorism, directory, mpi, omp, parallel)
+
+        """parameters for FCP"""
+        self.fcp_parameters = fcp_parameters
+    
+    def set_calculator(self):
+        """Set FCP calculators"""
+        os.environ['OMP_NUM_THREADS'] = f'{self.omp}'
+        profile = AbacusProfile(
+            argv=['mpirun', '-np', f'{self.mpi}', self.abacus])
+        if self.parallel:
+            out_directory = f"{self.directory}-rank{world.rank}"
+        else:
+            out_directory = self.directory
+        calc = Abacus(profile=profile, directory=out_directory, **self.parameters)
+        calc_fcp = FCP(innercalc = calc, **self.fcp_parameters)
+        return calc_fcp

@@ -112,3 +112,30 @@ class AbacusDimer:
             raise ValueError("init_eigenmode_method must be displacement or gauss")
         dimer_relax = MinModeTranslate(d_atoms, trajectory=dimer_traj)
         dimer_relax.run(fmax=fmax)
+
+class FcpDimer(AbacusDimer):
+    """Customize Dimer calculation workflow by using FCP-abacus-ase"""
+
+    def __init__(self, init_Atoms, fcp_parameters, parameters, abacus='abacus',
+                mpi=1, omp=1, directory='DIMER', 
+                traj_file='dimer.traj',
+                init_eigenmode_method='displacement',
+                displacement_vector: np.ndarray = None,):
+
+        AbacusDimer.__init__(self, init_Atoms, parameters, abacus,
+                            mpi, omp, directory, traj_file,
+                            init_eigenmode_method,
+                            displacement_vector: np.ndarray)
+
+        """parameters for FCP"""
+        self.fcp_parameters = fcp_parameters
+
+    def set_calculator(self):
+        """Set FCP calculators"""
+        os.environ['OMP_NUM_THREADS'] = f'{self.omp}'
+        profile = AbacusProfile(
+            argv=['mpirun', '-np', f'{self.mpi}', self.abacus])
+        out_directory = self.directory
+        calc = Abacus(profile=profile, directory=out_directory, **self.parameters)
+        calc_fcp = FCP(innercalc = calc, **self.fcp_parameters)
+        return calc_fcp
